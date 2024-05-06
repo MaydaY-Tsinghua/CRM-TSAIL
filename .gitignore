@@ -153,3 +153,7 @@ dmypy.json
 cython_debug/
 
 out/
+pixel/
+GSO/
+GSO_extracted/
+eval/

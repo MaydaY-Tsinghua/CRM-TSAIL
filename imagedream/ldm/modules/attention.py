@@ -239,7 +239,7 @@ class BasicTransformerBlock(nn.Module):
         **kwargs
     ):
         super().__init__()
-        assert XFORMERS_IS_AVAILBLE, "xformers is not available"
+        # assert XFORMERS_IS_AVAILBLE, "xformers is not available"
         attn_cls = MemoryEfficientCrossAttention
         self.disable_self_attn = disable_self_attn
         self.attn1 = attn_cls(

@@ -4,6 +4,7 @@ from imagedream.camera_utils import get_camera_for_index
 from imagedream.ldm.util import set_seed, add_random_background
 from libs.base_utils import do_resize_content
 from imagedream.ldm.models.diffusion.ddim import DDIMSampler
+from imagedream.ldm.models.diffusion.dpm_solver import DPMSolverSampler
 from torchvision import transforms as T
 
 
@@ -22,6 +23,7 @@ class ImageDreamDiffusion:
         resize_rate=1,
         image_size=256,
         seed=1234,
+        sampler="DDIM",
     ) -> None:
         assert mode in ["pixel", "local"]
         size = image_size
@@ -30,7 +32,15 @@ class ImageDreamDiffusion:
 
         neg_texts = "uniform low no texture ugly, boring, bad anatomy, blurry, pixelated,  obscure, unnatural colors, poor lighting, dull, and unclear."
         uc = model.get_learned_conditioning([neg_texts]).to(device)
-        sampler = DDIMSampler(model)
+        # sampler = DDIMSampler(model)
+        # sampler = DPMSolverSampler(model)
+        assert sampler in ("DDIM", "dpm-solver")
+        if sampler == "DDIM":
+            sampler = DDIMSampler(model)
+        elif sampler == "dpm-solver":
+            sampler = DPMSolverSampler(model)
+        print(type(sampler))
+        
 
         # pre-compute camera matrices
         camera = [get_camera_for_index(i).squeeze() for i in camera_views]

@@ -18,6 +18,7 @@ class TwoStagePipeline(object):
         device="cuda",
         dtype=torch.float16,
         resize_rate=1,
+        sampler="dpm-solver",
     ) -> None:
         """
         only for two stage generate process.
@@ -40,7 +41,7 @@ class TwoStagePipeline(object):
         self.device = device
         self.dtype = dtype
         self.stage1_sampler = get_obj_from_str(stage1_sampler_config.target)(
-            self.stage1_model, device=device, dtype=dtype, **stage1_sampler_config.params
+            self.stage1_model, device=device, dtype=dtype, **stage1_sampler_config.params, sampler = sampler
         )
         self.stage2_sampler = get_obj_from_str(stage2_sampler_config.target)(
             self.stage2_model, device=device, dtype=dtype, **stage2_sampler_config.params
@@ -140,7 +141,12 @@ class TwoStagePipeline(object):
             "stage1_images": stage1_images,
             "stage2_images": stage2_images,
         }
+    def call_image_multiview(self, pixel_img, prompt="3D assets", scale=5, step=50):
+        pixel_img = do_resize_content(pixel_img, self.resize_rate)
+        stage1_images = self.stage1_sample(pixel_img, prompt, scale=scale, step=step)
+        # stage2_images = self.stage2_sample(pixel_img, stage1_images, scale=scale, step=step)
 
+        return stage1_images
 rembg_session = rembg.new_session()
 
 def expand_to_square(image, bg_color=(0, 0, 0, 0)):
