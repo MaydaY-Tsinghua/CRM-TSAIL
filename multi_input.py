@@ -54,7 +54,8 @@ args = parser.parse_args()
 
 
 
-img = Image.open(args.inputdir)
+# img = Image.open(args.inputdir)
+img = Image.open("/root/CRM/GSO_extracted/1/thumbnails/1.jpg")
 img = preprocess_image(img, args.bg_choice, 1.0, (127, 127, 127))
 os.makedirs(args.outdir, exist_ok=True)
 img.save(args.outdir+"preprocessed_image.png")
@@ -88,12 +89,23 @@ pipeline = TwoStagePipeline(
     stage2_sampler_config,
     sampler = sampler
 )
+img1 = Image.open("/root/CRM/GSO_extracted/1/thumbnails/2.jpg")
+img1= preprocess_image(img1, args.bg_choice, 1.0, (127, 127, 127))
+additional_input_images = [img1]
+# additional_input_images = None
+additional_input_positions = [3]
+# additional_input_positions = None
 
+stage1_images = pipeline.call_image_multiview(img, scale=args.scale, step=args.step, additional_input_images=additional_input_images, additional_input_positions=additional_input_positions)
+# refrence_image = stage1_images[-1]
 
-stage1_images = pipeline.call_image_multiview(img, scale=args.scale, step=args.step)
-refrence_image = stage1_images[-1]
-
-refrence_image.save(args.outdir+"refrence_image.png")
+# refrence_image.save(args.outdir+"refrence_image.png")
 
 np_imgs = np.concatenate(stage1_images, 1)
 Image.fromarray(np_imgs).save(args.outdir+"pixel_images.png")
+
+stage1_images_no_additional_input = pipeline.call_image_multiview(img, scale=args.scale, step=args.step)
+np_imgs = np.concatenate(stage1_images_no_additional_input, 1)
+Image.fromarray(np_imgs).save(args.outdir+"pixel_images_no_additional_input.png")
+# for i,img in enumerate(stage1_images):
+#     img.save(args.outdir+f"pixel_images{i}.png")

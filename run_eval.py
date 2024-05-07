@@ -160,7 +160,7 @@ def evaluate(sampler,scale):
 # from concurrent.futures import ThreadPoolExecutor
 if __name__ == "__main__":
     # with ThreadPoolExecutor() as executor:
-    for scale in range(2,8):
+    for scale in range(5,8):
         scale = float(scale)
         for sampler in ['dpm-solver',"DDIM"]:
             evaluate(sampler,scale)

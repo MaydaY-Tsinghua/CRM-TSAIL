@@ -4,6 +4,7 @@ import torch
 import numpy as np
 from tqdm import tqdm
 from functools import partial
+from typing import List
 
 from ...modules.diffusionmodules.util import (
     make_ddim_sampling_parameters,
@@ -109,9 +110,12 @@ class DDIMSampler(object):
         log_every_t=100,
         unconditional_guidance_scale=1.0,
         unconditional_conditioning=None,
+        additional_input_images: List = None,
+        additional_input_positions: List = None,
         # this has to come in the same format as the conditioning, # e.g. as encoded tokens, ...
         **kwargs,
     ):
+        # use_additional_inputs = additional_input_images is not None
         if conditioning is not None:
             if isinstance(conditioning, dict):
                 cbs = conditioning[list(conditioning.keys())[0]].shape[0]
@@ -147,6 +151,8 @@ class DDIMSampler(object):
             log_every_t=log_every_t,
             unconditional_guidance_scale=unconditional_guidance_scale,
             unconditional_conditioning=unconditional_conditioning,
+            additional_input_images=additional_input_images,
+            additional_input_positions=additional_input_positions,
             **kwargs,
         )
         return samples, intermediates
@@ -171,6 +177,8 @@ class DDIMSampler(object):
         corrector_kwargs=None,
         unconditional_guidance_scale=1.0,
         unconditional_conditioning=None,
+        additional_input_images = None,
+        additional_input_positions = None,
         **kwargs,
     ):
         """
@@ -234,6 +242,15 @@ class DDIMSampler(object):
                     x0, ts
                 )  # TODO: deterministic forward pass?
                 img = img_orig * mask + (1.0 - mask) * img
+            use_additional_inputs = additional_input_images is not None
+            # if use_additional_inputs:
+            #     assert additional_input_images is not None
+            #     assert additional_input_positions is not None
+            #     # additional_input_noise = noise_like(additional_input_imags.shape, device)
+            #     additional_input_noises = []
+            #     for image in additional_input_images:
+            #         additional_input_noises.append(torch.randn_like(image))
+                
 
             outs = self.p_sample_ddim(
                 img,
@@ -248,6 +265,9 @@ class DDIMSampler(object):
                 corrector_kwargs=corrector_kwargs,
                 unconditional_guidance_scale=unconditional_guidance_scale,
                 unconditional_conditioning=unconditional_conditioning,
+                additional_input_images=additional_input_images,
+                additional_input_positions=additional_input_positions,
+                # additional_input_noises = additional_input_noises, 
                 **kwargs,
             )
             img, pred_x0 = outs
@@ -279,6 +299,9 @@ class DDIMSampler(object):
         unconditional_guidance_scale=1.0,
         unconditional_conditioning=None,
         dynamic_threshold=None,
+        additional_input_images = None,
+        additional_input_positions = None,
+        additional_input_noises = None,
         **kwargs,
     ):
         b, *_, device = *x.shape, x.device
@@ -362,7 +385,12 @@ class DDIMSampler(object):
 
         if dynamic_threshold is not None:
             raise NotImplementedError()
-
+        if additional_input_images is not None:
+            print("additional_input_images at", additional_input_positions)
+            for position, image in zip(additional_input_positions, additional_input_images, ):
+                # pred_x0 = torch.cat([pred_x0, image], dim=1)
+                pred_x0[position:position+1] = image
+                # e_t[position:position+1] = input_noise
         # direction pointing to x_t
         dir_xt = (1.0 - a_prev - sigma_t**2).sqrt() * e_t
         noise = sigma_t * noise_like(x.shape, device, repeat_noise) * temperature

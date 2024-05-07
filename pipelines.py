@@ -8,6 +8,7 @@ from omegaconf import OmegaConf
 from PIL import Image
 import PIL
 import rembg
+from typing import List
 class TwoStagePipeline(object):
     def __init__(
         self,
@@ -55,10 +56,14 @@ class TwoStagePipeline(object):
         step=50,
         scale=5,
         ddim_eta=0.0,
-    ):
+        additional_input_images: List = None,
+        additional_input_positions: List = None,
+    ):  
+        use_additional_input = additional_input_images is not None  
         if type(pixel_img) == str:
             pixel_img = Image.open(pixel_img)
-
+        if use_additional_input:
+            additional_input_images = [Image.open(img) if type(img) == str else img for img in additional_input_images]
         if isinstance(pixel_img, Image.Image):
             if pixel_img.mode == "RGBA":
                 background = Image.new('RGBA', pixel_img.size, (0, 0, 0, 0))
@@ -67,6 +72,16 @@ class TwoStagePipeline(object):
                 pixel_img = pixel_img.convert("RGB")
         else:
             raise
+        if use_additional_input:
+            dummy_list = []
+            for img in additional_input_images:
+                if img.mode == "RGBA":
+                    background = Image.new('RGBA', img.size, (0, 0, 0, 0))
+                    img = Image.alpha_composite(background, img).convert("RGB")
+                else:
+                    img = img.convert("RGB")
+                dummy_list.append(img)
+            additional_input_images = dummy_list
         uc = self.stage1_sampler.model.get_learned_conditioning([neg_texts]).to(self.device)
         stage1_images = self.stage1_sampler.i2i(
             self.stage1_sampler.model,
@@ -86,10 +101,13 @@ class TwoStagePipeline(object):
             pixel_control=(self.stage1_sampler.mode == "pixel"),
             transform=self.stage1_sampler.image_transform,
             offset_noise=self.stage1_sampler.offset_noise,
+            use_additional_input=use_additional_input,
+            additional_input_images=additional_input_images,
+            additional_input_positions=additional_input_positions,
         )
 
         stage1_images = [Image.fromarray(img) for img in stage1_images]
-        stage1_images.pop(self.stage1_sampler.ref_position)
+        # stage1_images.pop(self.stage1_sampler.ref_position)
         return stage1_images
 
     def stage2_sample(self, pixel_img, stage1_images, scale=5, step=50):
@@ -131,8 +149,9 @@ class TwoStagePipeline(object):
         self.stage1_sampler.seed = seed
         self.stage2_sampler.seed = seed
 
-    def __call__(self, pixel_img, prompt="3D assets", scale=5, step=50):
+    def __call__(self, pixel_img, prompt="3D assets", scale=5, step=50, ):
         pixel_img = do_resize_content(pixel_img, self.resize_rate)
+        
         stage1_images = self.stage1_sample(pixel_img, prompt, scale=scale, step=step)
         stage2_images = self.stage2_sample(pixel_img, stage1_images, scale=scale, step=step)
 
@@ -141,12 +160,16 @@ class TwoStagePipeline(object):
             "stage1_images": stage1_images,
             "stage2_images": stage2_images,
         }
-    def call_image_multiview(self, pixel_img, prompt="3D assets", scale=5, step=50):
+    def call_image_multiview(self, pixel_img, prompt="3D assets", scale=5, step=50,additional_input_images=None, additional_input_positions=None):
         pixel_img = do_resize_content(pixel_img, self.resize_rate)
-        stage1_images = self.stage1_sample(pixel_img, prompt, scale=scale, step=step)
+        if additional_input_images is not None:
+            additional_input_images = [do_resize_content(img, self.resize_rate) for img in additional_input_images]
+        stage1_images = self.stage1_sample(pixel_img, prompt, scale=scale, step=step,  additional_input_images=additional_input_images, additional_input_positions=additional_input_positions)
         # stage2_images = self.stage2_sample(pixel_img, stage1_images, scale=scale, step=step)
 
         return stage1_images
+    
+
 rembg_session = rembg.new_session()
 
 def expand_to_square(image, bg_color=(0, 0, 0, 0)):

@@ -6,6 +6,7 @@ from libs.base_utils import do_resize_content
 from imagedream.ldm.models.diffusion.ddim import DDIMSampler
 from imagedream.ldm.models.diffusion.dpm_solver import DPMSolverSampler
 from torchvision import transforms as T
+from typing import List
 
 
 class ImageDreamDiffusion:
@@ -89,6 +90,9 @@ class ImageDreamDiffusion:
         pixel_control=False,
         transform=None,
         offset_noise=False,
+        use_additional_input: bool = False,
+        additional_input_images: List = None,
+        additional_input_positions: List = None,
     ):
         """ The function supports additional image prompt.
         Args:
@@ -148,6 +152,21 @@ class ImageDreamDiffusion:
                 c_["ip_img"] = ip_img
                 uc_["ip_img"] = torch.zeros_like(ip_img)
 
+            if use_additional_input:
+                assert additional_input_images is not None
+                assert additional_input_positions is not None
+                assert len(additional_input_images) == len(additional_input_positions)
+                dummy_list = []
+                for i, img in enumerate(additional_input_images):
+                    img = transform(img).to(
+                        device
+                    )
+                    img = model.get_first_stage_encoding(
+                        model.encode_first_stage(img[None, :, :, :])
+                    )
+                    dummy_list.append(img)
+                additional_input_images = dummy_list
+
             shape = [4, image_size // 8, image_size // 8]  # [4, 32, 32]
             if offset_noise:
                 ref = transform(ip_raw).to(device)
@@ -167,6 +186,8 @@ class ImageDreamDiffusion:
                     unconditional_conditioning=uc_,
                     eta=ddim_eta,
                     x_T=x_T if offset_noise else None,
+                    additional_input_images=additional_input_images if use_additional_input else None,
+                    additional_input_positions=additional_input_positions if use_additional_input else None,
                 )
             )
 
